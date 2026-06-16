@@ -1,325 +1,235 @@
 import customtkinter as ctk
 from tkinter import messagebox
 from datetime import datetime
-
 from weather_api import get_weather, get_weather_by_coordinates
 from location import get_location
 
-# -----------------------------
-# APP SETTINGS
-# -----------------------------
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 app = ctk.CTk()
-app.title("Weather Forecast Dashboard")
-app.geometry("750x800")
+app.title("Advanced Weather Dashboard")
+app.geometry("1000x850")
 app.resizable(False, False)
 
 current_lat = None
 current_lon = None
+current_weather = None
+search_history = []
 
-# -----------------------------
-# WEATHER ICONS
-# -----------------------------
+
 def get_weather_icon(condition):
-    condition = condition.lower()
-
-    if "clear" in condition:
+    c = condition.lower()
+    if "clear" in c:
         return "☀️"
-    elif "cloud" in condition:
+    if "cloud" in c:
         return "☁️"
-    elif "rain" in condition:
+    if "rain" in c:
         return "🌧️"
-    elif "thunder" in condition:
+    if "thunder" in c:
         return "⛈️"
-    elif "snow" in condition:
+    if "snow" in c:
         return "❄️"
-    elif "mist" in condition:
-        return "🌫️"
-
     return "🌤️"
 
 
-# -----------------------------
-# CLOCK
-# -----------------------------
-def update_time():
+def update_clock():
     now = datetime.now()
-
-    date_label.configure(
-        text=now.strftime("%A, %d %B %Y")
-    )
-
-    time_label.configure(
-        text=now.strftime("%I:%M:%S %p")
-    )
-
-    app.after(1000, update_time)
+    date_label.configure(text=now.strftime("%A, %d %B %Y"))
+    time_label.configure(text=now.strftime("%I:%M:%S %p"))
+    app.after(1000, update_clock)
 
 
-# -----------------------------
-# UPDATE WEATHER
-# -----------------------------
-def update_weather(weather):
-    weather_icon.configure(
-        text=get_weather_icon(weather["condition"])
-    )
+def add_history(city):
+    if city in search_history:
+        search_history.remove(city)
+    search_history.insert(0, city)
+    del search_history[5:]
 
-    city_label.configure(
-        text=weather["city"]
-    )
-
-    temp_label.configure(
-        text=f"{round(weather['temperature'])}°C"
-    )
-
-    condition_label.configure(
-        text=weather["condition"]
-    )
-
-    humidity_value.configure(
-        text=f"{weather['humidity']}%"
-    )
-
-    wind_value.configure(
-        text=f"{weather['wind']} m/s"
-    )
+    history_box.configure(state="normal")
+    history_box.delete("1.0", "end")
+    for item in search_history:
+        history_box.insert("end", f"• {item}\n")
+    history_box.configure(state="disabled")
 
 
-# -----------------------------
-# SEARCH WEATHER
-# -----------------------------
+def update_weather(data):
+    global current_weather
+    current_weather = data
+
+    weather_icon.configure(text=get_weather_icon(data["condition"]))
+    city_label.configure(text=data["city"])
+    temp_label.configure(text=f'{round(data["temperature"])}°C')
+    condition_label.configure(text=data["condition"])
+
+    humidity_value.configure(text=f'{data["humidity"]}%')
+    wind_value.configure(text=f'{data["wind"]} m/s')
+
+    feels_value.configure(text=f'{round(data["feels_like"])}°C')
+    pressure_value.configure(text=f'{data["pressure"]} hPa')
+    visibility_value.configure(text=f'{data["visibility"]} km')
+    sunrise_value.configure(text=data["sunrise"])
+    sunset_value.configure(text=data["sunset"])
+
+
 def search_weather():
     city = city_entry.get().strip()
 
     if not city:
-        messagebox.showerror(
-            "Error",
-            "Please enter a city name."
-        )
+        messagebox.showerror("Error", "Please enter a city name.")
         return
 
     weather = get_weather(city)
 
-    if weather is None:
-        messagebox.showerror(
-            "Error",
-            "City not found."
-        )
+    if not weather:
+        messagebox.showerror("Error", "City not found.")
         return
 
+    add_history(weather["city"])
     update_weather(weather)
 
 
-# -----------------------------
-# AUTO LOCATION WEATHER
-# -----------------------------
-def load_current_location_weather():
+def load_location_weather():
     global current_lat, current_lon
 
-    location = get_location()
+    loc = get_location()
 
-    if location is None:
-        location_text.configure(
-            text="📍 Location Not Detected"
-        )
+    if not loc:
+        location_label.configure(text="📍 Location not detected")
         return
 
-    current_lat = location["lat"]
-    current_lon = location["lon"]
+    current_lat = loc["lat"]
+    current_lon = loc["lon"]
 
-    original_city = location["city"]
-
-    location_text.configure(
-        text=f"📍 Current Location: {original_city}"
-    )
-
-    weather = get_weather_by_coordinates(
-        current_lat,
-        current_lon
-    )
+    weather = get_weather_by_coordinates(current_lat, current_lon)
 
     if weather:
+        location_label.configure(text=f'📍 Current Location: {loc["city"]}')
         city_entry.delete(0, "end")
         city_entry.insert(0, weather["city"])
-
+        add_history(weather["city"])
         update_weather(weather)
 
 
-# -----------------------------
-# REFRESH
-# -----------------------------
 def refresh_weather():
     if current_lat is None:
         return
 
-    weather = get_weather_by_coordinates(
-        current_lat,
-        current_lon
-    )
-
+    weather = get_weather_by_coordinates(current_lat, current_lon)
     if weather:
         update_weather(weather)
 
 
-# -----------------------------
-# TITLE
-# -----------------------------
-title_label = ctk.CTkLabel(
-    app,
-    text="Weather Forecast Dashboard",
-    font=("Arial", 36, "bold")
-)
-title_label.pack(pady=(20, 10))
+def toggle_theme():
+    if theme_switch.get():
+        ctk.set_appearance_mode("light")
+    else:
+        ctk.set_appearance_mode("dark")
 
-# -----------------------------
-# DATE
-# -----------------------------
-date_label = ctk.CTkLabel(
-    app,
-    text="",
-    font=("Arial", 18)
-)
+
+def export_report():
+    if not current_weather:
+        messagebox.showerror("Error", "No weather data available.")
+        return
+
+    text = f"""
+Weather Report
+==============
+City: {current_weather['city']}
+Temperature: {current_weather['temperature']}°C
+Feels Like: {current_weather['feels_like']}°C
+Humidity: {current_weather['humidity']}%
+Pressure: {current_weather['pressure']} hPa
+Visibility: {current_weather['visibility']} km
+Wind Speed: {current_weather['wind']} m/s
+Condition: {current_weather['condition']}
+Sunrise: {current_weather['sunrise']}
+Sunset: {current_weather['sunset']}
+Generated: {datetime.now()}
+"""
+    with open("weather_report.txt", "w", encoding="utf-8") as f:
+        f.write(text)
+
+    messagebox.showinfo("Success", "weather_report.txt exported.")
+
+
+title = ctk.CTkLabel(app, text="Weather Dashboard", font=("Arial", 34, "bold"))
+title.pack(pady=10)
+
+date_label = ctk.CTkLabel(app, text="", font=("Arial", 18))
 date_label.pack()
 
-time_label = ctk.CTkLabel(
-    app,
-    text="",
-    font=("Arial", 24, "bold")
-)
-time_label.pack(pady=(0, 15))
+time_label = ctk.CTkLabel(app, text="", font=("Arial", 24, "bold"))
+time_label.pack()
 
-# -----------------------------
-# LOCATION
-# -----------------------------
-location_text = ctk.CTkLabel(
-    app,
-    text="📍 Detecting Location...",
-    font=("Arial", 18)
-)
-location_text.pack(pady=10)
+location_label = ctk.CTkLabel(app, text="📍 Detecting location...", font=("Arial", 18))
+location_label.pack(pady=10)
 
-# -----------------------------
-# SEARCH SECTION
-# -----------------------------
-search_frame = ctk.CTkFrame(
-    app,
-    fg_color="transparent"
-)
-search_frame.pack(pady=15)
+top_frame = ctk.CTkFrame(app, fg_color="transparent")
+top_frame.pack(pady=10)
 
-city_entry = ctk.CTkEntry(
-    search_frame,
-    width=350,
-    height=45,
-    placeholder_text="Enter city name"
-)
+city_entry = ctk.CTkEntry(top_frame, width=350, height=40, placeholder_text="Enter city")
 city_entry.grid(row=0, column=0, padx=10)
 
-search_button = ctk.CTkButton(
-    search_frame,
-    text="Search",
-    width=120,
-    height=45,
-    command=search_weather
-)
-search_button.grid(row=0, column=1)
+ctk.CTkButton(top_frame, text="Search", command=search_weather).grid(row=0, column=1, padx=5)
+ctk.CTkButton(top_frame, text="Refresh", command=refresh_weather).grid(row=0, column=2, padx=5)
+ctk.CTkButton(top_frame, text="Export Report", command=export_report).grid(row=0, column=3, padx=5)
 
-# -----------------------------
-# WEATHER CARD
-# -----------------------------
-weather_card = ctk.CTkFrame(
-    app,
-    width=600,
-    height=300,
-    corner_radius=25
-)
-weather_card.pack(pady=20)
+theme_switch = ctk.CTkSwitch(app, text="Light Mode", command=toggle_theme)
+theme_switch.pack()
 
-weather_icon = ctk.CTkLabel(
-    weather_card,
-    text="🌤️",
-    font=("Arial", 80)
-)
-weather_icon.pack(pady=(20, 5))
+weather_card = ctk.CTkFrame(app, corner_radius=20)
+weather_card.pack(pady=15, padx=20, fill="x")
 
-temp_label = ctk.CTkLabel(
-    weather_card,
-    text="--°C",
-    font=("Arial", 60, "bold")
-)
+weather_icon = ctk.CTkLabel(weather_card, text="🌤️", font=("Arial", 70))
+weather_icon.pack(pady=(15, 5))
+
+temp_label = ctk.CTkLabel(weather_card, text="--°C", font=("Arial", 54, "bold"))
 temp_label.pack()
 
-city_label = ctk.CTkLabel(
-    weather_card,
-    text="City",
-    font=("Arial", 28, "bold")
-)
+city_label = ctk.CTkLabel(weather_card, text="City", font=("Arial", 26, "bold"))
 city_label.pack()
 
-condition_label = ctk.CTkLabel(
-    weather_card,
-    text="Condition",
-    font=("Arial", 20)
-)
-condition_label.pack(pady=(0, 20))
+condition_label = ctk.CTkLabel(weather_card, text="Condition", font=("Arial", 18))
+condition_label.pack(pady=(0, 15))
 
-# -----------------------------
-# DETAILS CARD
-# -----------------------------
-details_frame = ctk.CTkFrame(
-    app,
-    width=600,
-    height=140,
-    corner_radius=25
-)
-details_frame.pack(pady=15)
+details = ctk.CTkFrame(app)
+details.pack(padx=20, pady=10, fill="x")
 
-humidity_title = ctk.CTkLabel(
-    details_frame,
-    text="Humidity",
-    font=("Arial", 20, "bold")
-)
-humidity_title.grid(row=0, column=0, padx=80, pady=(20, 5))
+labels = [
+    ("Humidity", "humidity_value"),
+    ("Wind", "wind_value"),
+    ("Feels Like", "feels_value"),
+    ("Pressure", "pressure_value"),
+    ("Visibility", "visibility_value"),
+    ("Sunrise", "sunrise_value"),
+    ("Sunset", "sunset_value"),
+]
 
-wind_title = ctk.CTkLabel(
-    details_frame,
-    text="Wind Speed",
-    font=("Arial", 20, "bold")
-)
-wind_title.grid(row=0, column=1, padx=80, pady=(20, 5))
+widgets = {}
+for i, (name, var) in enumerate(labels):
+    ctk.CTkLabel(details, text=name, font=("Arial", 16, "bold")).grid(row=i//2, column=(i%2)*2, padx=20, pady=8, sticky="w")
+    widgets[var] = ctk.CTkLabel(details, text="--", font=("Arial", 16))
+    widgets[var].grid(row=i//2, column=(i%2)*2+1, padx=10, pady=8, sticky="w")
 
-humidity_value = ctk.CTkLabel(
-    details_frame,
-    text="--",
-    font=("Arial", 28)
-)
-humidity_value.grid(row=1, column=0, pady=10)
+humidity_value = widgets["humidity_value"]
+wind_value = widgets["wind_value"]
+feels_value = widgets["feels_value"]
+pressure_value = widgets["pressure_value"]
+visibility_value = widgets["visibility_value"]
+sunrise_value = widgets["sunrise_value"]
+sunset_value = widgets["sunset_value"]
 
-wind_value = ctk.CTkLabel(
-    details_frame,
-    text="--",
-    font=("Arial", 28)
-)
-wind_value.grid(row=1, column=1, pady=10)
+history_frame = ctk.CTkFrame(app)
+history_frame.pack(fill="x", padx=20, pady=10)
 
-# -----------------------------
-# REFRESH BUTTON
-# -----------------------------
-refresh_button = ctk.CTkButton(
-    app,
-    text="🔄 Refresh Current Location Weather",
-    width=300,
-    height=45,
-    command=refresh_weather
-)
-refresh_button.pack(pady=20)
+ctk.CTkLabel(history_frame, text="Recent Searches", font=("Arial", 18, "bold")).pack(pady=5)
 
-# -----------------------------
-# STARTUP
-# -----------------------------
-update_time()
-load_current_location_weather()
+history_box = ctk.CTkTextbox(history_frame, height=100)
+history_box.pack(fill="x", padx=10, pady=10)
+history_box.configure(state="disabled")
+
+update_clock()
+load_location_weather()
 
 app.mainloop()
