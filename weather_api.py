@@ -26,39 +26,61 @@ def extract_weather_data(data):
 def get_weather(city):
     url = (
         f"https://api.openweathermap.org/data/2.5/weather"
-        f"?q={city}&appid={API_KEY}&units=metric"
+        f"?q={city}"
+        f"&appid={API_KEY}"
+        f"&units=metric"
     )
 
     try:
         response = requests.get(url, timeout=10)
 
         if response.status_code != 200:
+            print("Error:", response.text)
             return None
 
         data = response.json()
 
         return extract_weather_data(data)
 
-    except Exception:
+    except Exception as e:
+        print("Weather Error:", e)
         return None
 
 
 def get_weather_by_coordinates(lat, lon):
     url = (
         f"https://api.openweathermap.org/data/2.5/weather"
-        f"?lat={lat}&lon={lon}"
-        f"&appid={API_KEY}&units=metric"
+        f"?lat={lat}"
+        f"&lon={lon}"
+        f"&appid={API_KEY}"
+        f"&units=metric"
     )
 
     try:
         response = requests.get(url, timeout=10)
 
         if response.status_code != 200:
+            print("Error:", response.text)
             return None
 
         data = response.json()
 
         return extract_weather_data(data)
 
-    except Exception:
+    except Exception as e:
+        print("Coordinate Error:", e)
         return None
+
+
+if __name__ == "__main__":
+    print("\nTesting Weather API\n")
+
+    city = input("Enter city name: ")
+
+    weather = get_weather(city)
+
+    if weather:
+        print("\nWeather Data:")
+        print(weather)
+    else:
+        print("\nFailed to fetch weather data.")
